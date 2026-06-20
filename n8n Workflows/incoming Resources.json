@@ -1,0 +1,1368 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4aa0796a-f6a0-4f19-87d2-e781da763416",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "06006910-0c0e-4287-bf73-07f2ecef6025",
+              "leftValue": "={{ $binary.attachment_0.fileName }}",
+              "rightValue": ".pdf",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "1d99f5b0-ebfc-43cf-8059-0eb81277fbb8",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=YOUR_GEMINI_API_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 2000 } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "727b789b-8bfc-4b29-99e0-0271031ac5cd",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.documentType }}",
+                    "rightValue": "vendor_invoice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "38f5f15d-7bbb-4810-ad37-9771bc55014b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "vendor_invoice"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b38d1625-9c98-4e81-b051-8be6abba80b8",
+                    "leftValue": "={{ $json.documentType }}",
+                    "rightValue": "receipt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reciept"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7ec7a1de-e40e-403e-a08b-4402e170efba",
+                    "leftValue": "={{ $json.documentType }}",
+                    "rightValue": "onboarding_form",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "onboarding_form"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8668bc2f-1b9e-46be-b376-737a32861a1d",
+                    "leftValue": "={{ $json.documentType }}",
+                    "rightValue": "financial_statement",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "financial_statment"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1312,
+        -128
+      ],
+      "id": "4a2864a4-b1de-4476-9735-e7ae4ec4165f",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const responseText = item.json.candidates?.[0]?.content?.parts?.[0]?.text || '';\n  const cleaned = responseText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  \n  let parsed;\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    parsed = {\n      document_type: 'unknown',\n      confidence: 0,\n      extracted_data: { error: 'Failed to parse', raw_response: responseText.substring(0, 500) }\n    };\n  }\n  \n  // Flag low confidence as unknown\n  if (parsed.confidence < 0.7) {\n    parsed.document_type = 'unknown';\n  }\n  \n  items.push({\n    json: {\n      documentType: parsed.document_type,\n      confidence: parsed.confidence,\n      extractedData: parsed.extracted_data,\n      processedAt: new Date().toISOString(),\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "806095f7-caee-46ca-9399-0bcfead9d8aa",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        -128
+      ],
+      "id": "121e18d2-500e-4896-8395-8eef3fd10e8e",
+      "name": "Extract PDF Text"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const extractedText = (item.json.text || item.json.data || '').substring(0, 6000);\n  \n  // Escape the text so it's safe inside JSON\n  const safeText = extractedText\n    .replace(/\\\\/g, '\\\\\\\\')\n    .replace(/\"/g, '\\\\\"')\n    .replace(/\\n/g, '\\\\n')\n    .replace(/\\r/g, '\\\\r')\n    .replace(/\\t/g, '\\\\t');\n\n  const prompt = `You are an AI document processor for Apex Accounting, a CPA firm.\n\nSTEP 1 - CLASSIFY this document into exactly ONE type:\n- vendor_invoice (invoice from a vendor billing for products/services)\n- receipt (proof of payment for an expense)\n- onboarding_form (new client intake form)\n- financial_statement (P&L, balance sheet, income statement)\n\nSTEP 2 - EXTRACT all relevant structured data based on the document type.\n\nFor vendor_invoice extract: vendor_name, vendor_address, vendor_email, vendor_phone, invoice_number, invoice_date, due_date, payment_terms, bill_to_name, bill_to_address, line_items (array of {description, quantity, unit_price, amount}), subtotal, tax_amount, tax_rate, shipping, total_due, payment_instructions\n\nFor receipt extract: merchant_name, merchant_address, merchant_phone, receipt_date, receipt_number, line_items (array of {description, amount}), subtotal, tax_amount, tip, total, payment_method, business_purpose, attendees\n\nFor onboarding_form extract: business_name, dba_name, business_type, industry, ein_tax_id, state_of_formation, date_of_formation, fiscal_year_end, contact_name, contact_title, contact_email, contact_phone, contact_address, services_requested (array), estimated_monthly_fee\n\nFor financial_statement extract: company_name, statement_type, period_ending, prepared_by, prepared_date, total_revenue, total_expenses, net_income, revenue_breakdown (array of {category, amount}), expense_breakdown (array of {category, amount}), notes\n\nRespond with ONLY a valid JSON object in this format, nothing else:\n{\n  \"document_type\": \"<type>\",\n  \"confidence\": <0.0-1.0>,\n  \"extracted_data\": { ... all fields for this document type ... }\n}\n\nIf a field is missing or unclear, set it to null. Never guess.\n\n--- DOCUMENT TEXT ---\n${safeText}`;\n\n  items.push({\n    json: {\n      prompt: prompt,\n      extractedText: extractedText,\n      senderEmail: item.json.from?.value?.[0]?.address || item.json.from || '',\n      senderName: item.json.from?.value?.[0]?.name || '',\n      emailSubject: item.json.subject || '',\n      fileName: item.json.attachments?.[0]?.filename || '',\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -128
+      ],
+      "id": "204e2820-00fc-469a-94d8-d612245058b8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "search",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "email|string",
+                    "value": "={{ $json.extractedData.contact_email }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1648,
+        -128
+      ],
+      "id": "3de0d10e-2a6c-4ed0-8875-1a74bd182929",
+      "name": "Search contacts2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3e559189-e947-4176-b746-47a416d597b7",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1856,
+        -128
+      ],
+      "id": "65437821-7747-4e61-995d-54c96ef9363d",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $('Switch').item.json.extractedData.contact_email }}",
+        "additionalFields": {
+          "companyName": "={{ $('Switch').item.json.extractedData.business_name }}",
+          "jobTitle": "={{$('Switch').item.json.extractedData.contact_title }}",
+          "phoneNumber": "={{ $('Switch').item.json.extractedData.contact_phone }}",
+          "streetAddress": "={{ $('Switch').item.json.extractedData.contact_address }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        2096,
+        -128
+      ],
+      "id": "b02c10c3-48ff-4534-b0b6-8a6ffcd7711a",
+      "name": "Create or update a contact",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "stage": "appointmentscheduled",
+        "additionalFields": {
+          "amount": "={{ $('Switch').item.json.extractedData.estimated_monthly_fee.replace(/[^0-9.]/g, '') }}",
+          "dealName": "={{ $('Switch').item.json.extractedData.business_name }} - Onboarding",
+          "pipeline": "default"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        2800,
+        -128
+      ],
+      "id": "5a9790a8-561a-4e03-81d0-1291e27867ca",
+      "name": "Create a deal",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Switch').item.json.extractedData.contact_email }}",
+        "subject": "Welcome to Apex Accounting — Next Steps",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #1B2A4A; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">Welcome to Apex Accounting</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <p>Dear {{ $('Switch').item.json.extractedData.contact_name }},</p>\n\n    <p>Thank you for choosing Apex Accounting. We've received your onboarding form and our team is reviewing your information.</p>\n\n    <h3 style=\"color: #1B2A4A; border-bottom: 2px solid #2E86AB; padding-bottom: 5px;\">What Happens Next</h3>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr><td style=\"padding: 10px; vertical-align: top; width: 30px;\"><span style=\"background-color: #2E86AB; color: white; padding: 4px 10px; border-radius: 50%; font-weight: bold;\">1</span></td><td style=\"padding: 10px;\">Our team will review your submitted documents within <strong>24 hours</strong></td></tr>\n      <tr><td style=\"padding: 10px; vertical-align: top;\"><span style=\"background-color: #2E86AB; color: white; padding: 4px 10px; border-radius: 50%; font-weight: bold;\">2</span></td><td style=\"padding: 10px;\">You'll receive a <strong>service agreement</strong> for the requested services</td></tr>\n      <tr><td style=\"padding: 10px; vertical-align: top;\"><span style=\"background-color: #2E86AB; color: white; padding: 4px 10px; border-radius: 50%; font-weight: bold;\">3</span></td><td style=\"padding: 10px;\">Your dedicated accountant will reach out to schedule an <strong>intro call</strong></td></tr>\n    </table>\n\n    <h3 style=\"color: #1B2A4A; border-bottom: 2px solid #2E86AB; padding-bottom: 5px;\">Your Details</h3>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr><td style=\"padding: 8px 0; color: #666;\">Company</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.business_name }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Business Type</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.business_type }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Services</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.services_requested.join(', ') }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Est. Monthly Fee</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.estimated_monthly_fee }}</td></tr>\n    </table>\n\n    <p>If you have any questions, reply to this email or call us at <strong>(214) 555-0800</strong>.</p>\n\n    <p>Best regards,<br><strong>Apex Accounting Team</strong></p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3040,
+        -128
+      ],
+      "id": "c7375d0d-771c-4664-a6fe-b801d8ca9175",
+      "name": "Send a message",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/objects/notes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"properties\": {\n    \"hs_timestamp\": new Date().toISOString(),\n    \"hs_note_body\": \"FINANCIAL STATEMENT PROCESSED\\n\\nCompany: \" + $('Switch').item.json.extractedData.company_name + \"\\nStatement Type: \" + $('Switch').item.json.extractedData.statement_type + \"\\nPeriod Ending: \" + $('Switch').item.json.extractedData.period_ending + \"\\n\\nTotal Revenue: \" + $('Switch').item.json.extractedData.total_revenue + \"\\nTotal Expenses: \" + $('Switch').item.json.extractedData.total_expenses + \"\\nNet Income: \" + $('Switch').item.json.extractedData.net_income + \"\\n\\nPrepared by: \" + $('Switch').item.json.extractedData.prepared_by + \"\\nDate: \" + $('Switch').item.json.extractedData.prepared_date\n  },\n  \"associations\": [{\n    \"to\": { \"id\": $json.id },\n    \"types\": [{ \"associationCategory\": \"HUBSPOT_DEFINED\", \"associationTypeId\": 202 }]\n  }]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2112,
+        80
+      ],
+      "id": "30d99a53-6c0d-4895-b7dc-6785f222257f",
+      "name": "HTTP Request1",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot account 2"
+        },
+        "hubspotOAuth2Api": {
+          "id": "YOUR_HUBSPOT_OAUTH2_CREDENTIAL_ID",
+          "name": "HubSpot account"
+        },
+        "hubspotApi": {
+          "id": "YOUR_HUBSPOT_API_CREDENTIAL_ID",
+          "name": "HubSpot account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "search",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "company|string",
+                    "value": "={{ $json.extractedData.company_name }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        48
+      ],
+      "id": "3fe61452-29a9-405c-970a-f68f50fb69bc",
+      "name": "Search contacts",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3e559189-e947-4176-b746-47a416d597b7",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        80
+      ],
+      "id": "738b4636-48c5-4960-98d5-32035e1ca2e3",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "{{ $('Switch').item.json.extractedData.contact_email }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #1565C0; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">📊 Financial Statement Processed</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\">\n      <tr><td style=\"padding: 8px 0; color: #666;\">Company</td><td style=\"padding: 8px 0; font-weight: bold;\">{{ $('Switch').item.json.extractedData.company_name }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Statement Type</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.statement_type }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Period Ending</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.period_ending }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Prepared By</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.prepared_by }}</td></tr>\n    </table>\n\n    <h3 style=\"color: #1565C0; border-bottom: 2px solid #42A5F5; padding-bottom: 5px;\">Key Figures</h3>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"background-color: #E3F2FD;\">\n        <td style=\"padding: 12px; font-weight: bold;\">Total Revenue</td>\n        <td style=\"padding: 12px; text-align: right; font-size: 18px; color: #2E7D32;\">{{ $('Switch').item.json.extractedData.total_revenue }}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 12px; font-weight: bold;\">Total Expenses</td>\n        <td style=\"padding: 12px; text-align: right; font-size: 18px; color: #D32F2F;\">{{ $('Switch').item.json.extractedData.total_expenses }}</td>\n      </tr>\n      <tr style=\"background-color: #E8F5E9;\">\n        <td style=\"padding: 12px; font-weight: bold; font-size: 16px;\">Net Income</td>\n        <td style=\"padding: 12px; text-align: right; font-size: 20px; font-weight: bold; color: #1B5E20;\">{{ $('Switch').item.json.extractedData.net_income }}</td>\n      </tr>\n    </table>\n\n    <div style=\"background-color: #E3F2FD; padding: 12px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #1565C0;\">\n      <strong>ℹ️ Note:</strong> This data has been attached to the client's HubSpot record. Please review at your convenience.\n    </div>\n\n    <p style=\"color: #999; font-size: 12px; margin-top: 20px;\">Processed by AI System</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2112,
+        256
+      ],
+      "id": "3b659db5-3eae-4e6c-87f2-c6ed8f6d59f6",
+      "name": "Send a message1",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Financial Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date Received": "={{ new Date().toISOString().split('T')[0] }}",
+            "Client Name": "={{ $('Switch').item.json.extractedData.bill_to_name }}",
+            "Company": "={{ $('Switch').item.json.extractedData.bill_to_name }}",
+            "Document Type": "=vendor_invoice",
+            "Description": "=Invoice from {{ $('Switch').item.json.extractedData.vendor_name }} - #{{ $('Switch').item.json.extractedData.invoice_number }}",
+            "Amount": "={{ $('Switch').item.json.extractedData.subtotal }}",
+            "Tax": "={{ $('Switch').item.json.extractedData.tax_amount }}",
+            "Total": "={{ $('Switch').item.json.extractedData.total_due }}",
+            "Due Date": "={{ $('Switch').item.json.extractedData.due_date }}",
+            "Status": "=Pending Approval",
+            "HubSpot Contact ID": "=''",
+            "Processed By": "=AI System",
+            "Notes": "=Payment terms: {{ $('Switch').item.json.extractedData.payment_terms }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date Received",
+              "displayName": "Date Received",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client Name",
+              "displayName": "Client Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Document Type",
+              "displayName": "Document Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due Date",
+              "displayName": "Due Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "HubSpot Contact ID",
+              "displayName": "HubSpot Contact ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Processed By",
+              "displayName": "Processed By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1520,
+        -496
+      ],
+      "id": "7db063fa-fc3e-49af-adb1-a7f5dc34d6ea",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "=Invoice Needs Approval — {{ $('Switch').item.json.extractedData.vendor_name }} — {{ $('Switch').item.json.extractedData.total_due }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #1B2A4A; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">🧾 Invoice Needs Approval</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\">\n      <tr><td style=\"padding: 8px 0; color: #666;\">Vendor</td><td style=\"padding: 8px 0; font-weight: bold;\">{{ $('Switch').item.json.extractedData.vendor_name }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Invoice #</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.invoice_number }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Due Date</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.due_date }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Payment Terms</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.payment_terms }}</td></tr>\n    </table>\n\n    <h3 style=\"color: #1B2A4A; border-bottom: 2px solid #2E86AB; padding-bottom: 5px;\">Line Items</h3>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"background-color: #f5f5f5;\">\n        <th style=\"text-align: left; padding: 8px;\">Item</th>\n        <th style=\"text-align: right; padding: 8px;\">Amount</th>\n      </tr>\n      {{  $('Switch').item.json.extractedData.line_items.map(item => '<tr><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">' + item.description + '</td><td style=\"padding: 8px; border-bottom: 1px solid #eee; text-align: right;\">' + (item.amount || item.unit_price) + '</td></tr>').join('') }}\n    </table>\n\n    <table style=\"width: 100%; margin-top: 15px;\">\n      <tr><td style=\"padding: 5px 8px; text-align: right; color: #666;\">Subtotal:</td><td style=\"padding: 5px 8px; text-align: right; width: 100px;\">{{ $('Switch').item.json.extractedData.subtotal }}</td></tr>\n      <tr><td style=\"padding: 5px 8px; text-align: right; color: #666;\">Tax:</td><td style=\"padding: 5px 8px; text-align: right;\">{{ $('Switch').item.json.extractedData.tax_amount }}</td></tr>\n      <tr style=\"font-size: 18px; font-weight: bold;\">\n        <td style=\"padding: 10px 8px; text-align: right; border-top: 2px solid #1B2A4A;\">Total Due:</td>\n        <td style=\"padding: 10px 8px; text-align: right; border-top: 2px solid #1B2A4A;\">{{ $('Switch').item.json.extractedData.total_due }}</td>\n      </tr>\n    </table>\n\n    <div style=\"background-color: #FFF3E0; padding: 12px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #FF9800;\">\n      <strong>⚠️ Action Required:</strong> Please review and approve this invoice.\n    </div>\n\n    <p style=\"color: #999; font-size: 12px; margin-top: 20px;\">Logged to: Apex Accounting - Financial Log | Processed by AI System</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        -496
+      ],
+      "id": "4726003f-bb9e-4023-a3a9-9489deab38ec",
+      "name": "Send a message2",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Financial Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date Received": "={{ new Date().toISOString().split('T')[0] }}",
+            "Client Name": "={{ $('Switch').item.json.extractedData.attendees }}",
+            "Company": "=''",
+            "Document Type": "=receipt",
+            "Description": "={{ $('Switch').item.json.extractedData.merchant_name }} - {{ $('Switch').item.json.extractedData.business_purpose }}",
+            "Amount": "={{ $('Switch').item.json.extractedData.subtotal }}",
+            "Tax": "={{ $('Switch').item.json.extractedData.tax_amount }}",
+            "Total": "={{ $('Switch').item.json.extractedData.total }}",
+            "Due Date": "=''",
+            "Status": "=logged",
+            "HubSpot Contact ID": "=''",
+            "Processed By": "=AI System",
+            "Notes": "=Payment: {{ $('Switch').item.json.extractedData.payment_method }}. Tip: {{ $('Switch').item.json.extractedData.tip }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date Received",
+              "displayName": "Date Received",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client Name",
+              "displayName": "Client Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Document Type",
+              "displayName": "Document Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due Date",
+              "displayName": "Due Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "HubSpot Contact ID",
+              "displayName": "HubSpot Contact ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Processed By",
+              "displayName": "Processed By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        -304
+      ],
+      "id": "b1469010-edf1-4275-a2e1-1cf2150969c9",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "=Receipt Logged — {{ $('Switch').item.json.extractedData.merchant_name }} — {{ $('Switch').item.json.extractedData.total }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #2E7D32; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">🧾 Expense Receipt Logged</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\">\n      <tr><td style=\"padding: 8px 0; color: #666;\">Merchant</td><td style=\"padding: 8px 0; font-weight: bold;\">{{ $('Switch').item.json.extractedData.merchant_name }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Date</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.receipt_date }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Purpose</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.business_purpose }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Attendees</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.attendees }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Payment</td><td style=\"padding: 8px 0;\">{{ $('Switch').item.json.extractedData.payment_method }}</td></tr>\n    </table>\n\n    <h3 style=\"color: #2E7D32; border-bottom: 2px solid #4CAF50; padding-bottom: 5px;\">Items</h3>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"background-color: #f5f5f5;\">\n        <th style=\"text-align: left; padding: 8px;\">Item</th>\n        <th style=\"text-align: right; padding: 8px;\">Amount</th>\n      </tr>\n      {{ $('Switch').item.json.extractedData.line_items.map(item => '<tr><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">' + item.description + '</td><td style=\"padding: 8px; border-bottom: 1px solid #eee; text-align: right;\">$' + item.amount + '</td></tr>').join('') }}\n    </table>\n\n    <table style=\"width: 100%; margin-top: 15px;\">\n      <tr><td style=\"padding: 5px 8px; text-align: right; color: #666;\">Subtotal:</td><td style=\"padding: 5px 8px; text-align: right; width: 100px;\">{{ $('Switch').item.json.extractedData.subtotal }}</td></tr>\n      <tr><td style=\"padding: 5px 8px; text-align: right; color: #666;\">Tax:</td><td style=\"padding: 5px 8px; text-align: right;\">{{ $('Switch').item.json.extractedData.tax_amount }}</td></tr>\n      <tr><td style=\"padding: 5px 8px; text-align: right; color: #666;\">Tip:</td><td style=\"padding: 5px 8px; text-align: right;\">{{ $('Switch').item.json.extractedData.tip }}</td></tr>\n      <tr style=\"font-size: 18px; font-weight: bold;\">\n        <td style=\"padding: 10px 8px; text-align: right; border-top: 2px solid #2E7D32;\">Total:</td>\n        <td style=\"padding: 10px 8px; text-align: right; border-top: 2px solid #2E7D32;\">{{ $('Switch').item.json.extractedData.total }}</td>\n      </tr>\n    </table>\n\n    <div style=\"background-color: #E8F5E9; padding: 12px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #4CAF50;\">\n      <strong>✅ Status:</strong> Automatically logged. No action required.\n    </div>\n\n    <p style=\"color: #999; font-size: 12px; margin-top: 20px;\">Logged to: Apex Accounting - Financial Log | Processed by AI System</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        -304
+      ],
+      "id": "2364450a-52d3-4331-8018-aa97c675ec0f",
+      "name": "Send a message3",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Switch').first().json.extractedData;\nconst email = data.contact_email;\nconst name = data.contact_name;\nconst company = data.business_name;\nconst fee = data.estimated_monthly_fee || '$0';\nconst services = data.services_requested || [];\n\n// Parse the monthly fee as a number\nconst totalFee = parseFloat(fee.replace(/[^0-9.]/g, '')) || 0;\n\n// Create a row for each service, splitting the fee roughly\nconst perServiceFee = services.length > 0 ? totalFee / services.length : totalFee;\n\nconst items = services.map(service => ({\n  json: {\n    clientEmail: email,\n    clientName: name,\n    company: company,\n    serviceDescription: service,\n    quantity: '1',\n    rate: perServiceFee.toFixed(2),\n    amount: perServiceFee.toFixed(2),\n    status: 'Active'\n  }\n}));\n\n// If no services parsed, create one generic row\nif (items.length === 0) {\n  items.push({\n    json: {\n      clientEmail: email,\n      clientName: name,\n      company: company,\n      serviceDescription: 'Accounting Services',\n      quantity: '1',\n      rate: totalFee.toFixed(2),\n      amount: totalFee.toFixed(2),\n      status: 'Active'\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        -128
+      ],
+      "id": "24a558f9-2384-4202-a81f-fbc97b667803",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Financial Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2084858803,
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Service Plans",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=2084858803"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Client Email": "={{ $json.clientEmail }}",
+            "Client Name": "={{ $json.clientName }}",
+            "Company": "={{ $json.company }}",
+            "Service Description": "={{ $json.serviceDescription }}",
+            "Quantity": "={{ $json.quantity }}",
+            "Rate": "={{ $json.rate }}",
+            "Amount": "={{ $json.amount }}",
+            "Status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Client Email",
+              "displayName": "Client Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client Name",
+              "displayName": "Client Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service Description",
+              "displayName": "Service Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Rate",
+              "displayName": "Rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2512,
+        -128
+      ],
+      "id": "28066b27-558b-4c4e-b549-38fa49caca50",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "=Manual Review Needed — Unclassified Document",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #D32F2F; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">⚠️ Document Needs Manual Review</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <p>The AI system received a document it couldn't confidently classify.</p>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr><td style=\"padding: 8px 0; color: #666;\">Classification Attempt:</td><td style=\"padding: 8px 0;\">{{ $json.documentType }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Confidence Score:</td><td style=\"padding: 8px 0;\">{{ $json.confidence }}</td></tr>\n      <tr><td style=\"padding: 8px 0; color: #666;\">Processed At:</td><td style=\"padding: 8px 0;\">{{ $json.processedAt }}</td></tr>\n    </table>\n    <div style=\"background-color: #FFF3E0; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #FF9800;\">\n      <strong>Action Required:</strong> Please check the original email, classify the document manually, and process it accordingly.\n    </div>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        272
+      ],
+      "id": "79b81bcf-b701-47f3-a316-bc0cba7f1d36",
+      "name": "Send a message4",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "=Unsupported File Received",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background-color: #FF9800; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: #ffffff; margin: 0;\">📎 Unsupported File Type</h2>\n  </div>\n  <div style=\"padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;\">\n    <p>An email was received with a non-PDF attachment. The AI system only processes PDF files.</p>\n    <p>Please check the original email and process manually if needed.</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        96
+      ],
+      "id": "fc3b4268-a8d0-4835-a877-e612509f8b8f",
+      "name": "Send a message5",
+      "webhookId": "5e8ba296-4bf6-4033-9947-695bff11fa4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search contacts2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search contacts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search contacts2": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Create or update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create or update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or update a contact": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a deal": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Search contacts": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        []
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet2": {
+      "main": [
+        [
+          {
+            "node": "Create a deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e8223469-f5c2-4b47-a51b-eacee340f300",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "PUwNpu0oMyI7B6Py",
+  "tags": []
+}

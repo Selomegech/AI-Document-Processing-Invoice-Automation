@@ -1,0 +1,326 @@
+{
+  "name": "outgoing invoice",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cabfdf06-0207-47ac-a666-533870b4c46b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Financial Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2084858803,
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Service Plans",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=2084858803"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "=Active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        352,
+        144
+      ],
+      "id": "4d2efe9c-c6a7-4cfa-b347-4263c3beaa11",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json);\n\n// Group services by client email\nconst clientMap = {};\nfor (const row of rows) {\n  const email = row['Client Email'];\n  if (!email) continue;\n  \n  if (!clientMap[email]) {\n    clientMap[email] = {\n      clientEmail: email,\n      clientName: row['Client Name'] || '',\n      company: row['Company'] || '',\n      services: []\n    };\n  }\n  \n  clientMap[email].services.push({\n    description: row['Service Description'] || '',\n    quantity: row['Quantity'] || '1',\n    rate: parseFloat(row['Rate']) || 0,\n    amount: parseFloat(row['Amount']) || 0\n  });\n}\n\n// Generate invoice data for each client\nconst invoices = [];\nlet invoiceCounter = 1;\n\nfor (const email in clientMap) {\n  const client = clientMap[email];\n  const subtotal = client.services.reduce((sum, s) => sum + s.amount, 0);\n  const now = new Date();\n  const dueDate = new Date(now);\n  dueDate.setDate(dueDate.getDate() + 30);\n  \n  const invoiceNumber = `APEX-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(invoiceCounter).padStart(2, '0')}`;\n  invoiceCounter++;\n  \n  const prevMonth = new Date(now);\n  prevMonth.setMonth(prevMonth.getMonth() - 1);\n  const servicePeriod = `${prevMonth.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})} - ${new Date(now.getFullYear(), now.getMonth(), 0).toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})}`;\n\n  const lineItemsHtml = client.services.map(s => \n    `<tr>\n      <td style=\"padding: 10px; border-bottom: 1px solid #eee;\">${s.description}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #eee; text-align: center;\">${s.quantity}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #eee; text-align: right;\">$${s.rate.toFixed(2)}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #eee; text-align: right;\">$${s.amount.toFixed(2)}</td>\n    </tr>`\n  ).join('');\n\n  const invoiceHtml = `\n<div style=\"font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; border: 1px solid #ddd;\">\n  <div style=\"background-color: #1B2A4A; padding: 25px;\">\n    <h1 style=\"color: #ffffff; margin: 0; font-size: 24px;\">APEX ACCOUNTING</h1>\n    <p style=\"color: #aabbcc; margin: 5px 0 0 0; font-size: 11px;\">890 Financial Parkway, Suite 200, Dallas, TX 75201 | (214) 555-0800 | billing@apexaccounting.com</p>\n  </div>\n  <div style=\"background-color: #2E86AB; height: 4px;\"></div>\n  \n  <div style=\"padding: 25px;\">\n    <table style=\"width: 100%; margin-bottom: 20px;\">\n      <tr>\n        <td style=\"vertical-align: top; width: 50%;\">\n          <h3 style=\"color: #2E86AB; margin: 0 0 8px 0;\">BILL TO:</h3>\n          <p style=\"margin: 3px 0;\"><strong>${client.company}</strong></p>\n          <p style=\"margin: 3px 0;\">Attn: ${client.clientName}</p>\n          <p style=\"margin: 3px 0;\">${client.clientEmail}</p>\n        </td>\n        <td style=\"vertical-align: top; text-align: right;\">\n          <h2 style=\"color: #1B2A4A; margin: 0;\">INVOICE</h2>\n          <p style=\"margin: 5px 0;\"><strong>Invoice #:</strong> ${invoiceNumber}</p>\n          <p style=\"margin: 5px 0;\"><strong>Date:</strong> ${now.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</p>\n          <p style=\"margin: 5px 0;\"><strong>Due:</strong> ${dueDate.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</p>\n          <p style=\"margin: 5px 0;\"><strong>Terms:</strong> Net 30</p>\n        </td>\n      </tr>\n    </table>\n    \n    <p style=\"color: #666; font-style: italic; margin-bottom: 15px;\">Service Period: ${servicePeriod}</p>\n    \n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"background-color: #1B2A4A; color: white;\">\n        <th style=\"padding: 10px; text-align: left;\">Service Description</th>\n        <th style=\"padding: 10px; text-align: center;\">Qty</th>\n        <th style=\"padding: 10px; text-align: right;\">Rate</th>\n        <th style=\"padding: 10px; text-align: right;\">Amount</th>\n      </tr>\n      ${lineItemsHtml}\n    </table>\n    \n    <table style=\"width: 250px; margin-left: auto; margin-top: 15px;\">\n      <tr><td style=\"padding: 5px;\">Subtotal:</td><td style=\"padding: 5px; text-align: right;\">$${subtotal.toFixed(2)}</td></tr>\n      <tr><td style=\"padding: 5px;\">Tax:</td><td style=\"padding: 5px; text-align: right;\">$0.00</td></tr>\n      <tr style=\"font-size: 18px; font-weight: bold; background: #1B2A4A; color: white;\">\n        <td style=\"padding: 10px;\">Total Due:</td>\n        <td style=\"padding: 10px; text-align: right;\">$${subtotal.toFixed(2)}</td>\n      </tr>\n    </table>\n    \n    <div style=\"margin-top: 25px; padding: 15px; background: #f9f9f9; border-radius: 6px;\">\n      <strong>Payment Methods:</strong><br>\n      <span style=\"font-size: 11px;\">ACH/Wire: Chase Bank | Routing: 111000614 | Acct: 9920-4481-3307</span><br>\n      <span style=\"font-size: 11px;\">Check: Payable to Apex Accounting LLC</span><br>\n      <span style=\"font-size: 11px;\">Online: https://pay.apexaccounting.com/invoice/${invoiceNumber}</span>\n    </div>\n    \n    <div style=\"text-align: center; margin-top: 20px; padding: 10px; background: #2E86AB; color: white; border-radius: 4px;\">\n      <strong>Thank you for your business!</strong>\n    </div>\n  </div>\n  <div style=\"padding: 10px; text-align: center; color: #999; font-size: 9px; border-top: 1px solid #eee;\">\n    Apex Accounting LLC | Licensed CPA Firm | Late payments subject to 1.5% monthly interest\n  </div>\n</div>`;\n\n  invoices.push({\n    json: {\n      clientEmail: client.clientEmail,\n      clientName: client.clientName,\n      company: client.company,\n      invoiceNumber: invoiceNumber,\n      servicePeriod: servicePeriod,\n      subtotal: subtotal,\n      total: subtotal,\n      dueDate: dueDate.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}),\n      invoiceHtml: invoiceHtml,\n      serviceCount: client.services.length,\n    }\n  });\n}\n\nreturn invoices;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        144
+      ],
+      "id": "39e0e66d-031e-46da-b0d9-87686ddbfb63",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Apex Accounting - Financial Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date Received": "={{ new Date().toISOString().split('T')[0] }}",
+            "Client Name": "={{ $json.clientName }}",
+            "Company": "={{ $json.company }}",
+            "Document Type": "=outgoing_invoice",
+            "Description": "=Invoice {{ $json.invoiceNumber }} - {{ $json.servicePeriod }}",
+            "Amount": "={{ $json.subtotal }}",
+            "Tax": "=0",
+            "Total": "={{ $json.total }}",
+            "Due Date": "={{ $json.dueDate }}",
+            "Status": "=Sent",
+            "Processed By": "AI System",
+            "HubSpot Contact ID": "=''",
+            "Notes": "=Auto-generated monthly invoice ({{ $json.serviceCount }} services)"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date Received",
+              "displayName": "Date Received",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client Name",
+              "displayName": "Client Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Document Type",
+              "displayName": "Document Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due Date",
+              "displayName": "Due Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "HubSpot Contact ID",
+              "displayName": "HubSpot Contact ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Processed By",
+              "displayName": "Processed By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        144
+      ],
+      "id": "2b0156c9-0428-460a-8e78-f6183bc3561f",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL@example.com",
+        "subject": "=Invoice {{ $('Code in JavaScript').item.json.invoiceNumber }} — Apex Accounting — ${{ $('Code in JavaScript').item.json.total.toFixed(2) }}",
+        "message": "={{ $('Code in JavaScript').item.json.invoiceHtml }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        976,
+        144
+      ],
+      "id": "ad4585e1-6958-4420-96e7-0f5d9c2a4281",
+      "name": "Send a message",
+      "webhookId": "55b4e14c-c899-4bb2-81ef-fc38640e32f7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fc54b8e0-bdee-4ed0-b31e-38fbcb3f84c4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "Bgjcat4TuoUryvb4",
+  "tags": []
+}
