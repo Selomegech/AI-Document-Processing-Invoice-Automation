@@ -1,0 +1,16 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <div style="background-color: #D32F2F; padding: 20px; border-radius: 8px 8px 0 0;">
+    <h2 style="color: #ffffff; margin: 0;">⚠️ Document Needs Manual Review</h2>
+  </div>
+  <div style="padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+    <p>The AI system received a document it couldn't confidently classify.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="padding: 8px 0; color: #666;">Classification Attempt:</td><td style="padding: 8px 0;">{{document_type}}</td></tr>
+      <tr><td style="padding: 8px 0; color: #666;">Confidence Score:</td><td style="padding: 8px 0;">{{confidence}}</td></tr>
+      <tr><td style="padding: 8px 0; color: #666;">Processed At:</td><td style="padding: 8px 0;">{{processed_at}}</td></tr>
+    </table>
+    <div style="background-color: #FFF3E0; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #FF9800;">
+      <strong>Action Required:</strong> Please check the original email, classify the document manually, and process it accordingly.
+    </div>
+  </div>
+</div>
