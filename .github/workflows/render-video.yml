@@ -1,0 +1,36 @@
+name: Render Video
+
+on:
+  push:
+    branches: [ "main", "master", "video" ]
+  workflow_dispatch: # Allows triggering manually from the Actions tab
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      working-directory: ./remotion-video
+      run: npm install
+      
+    - name: Install FFMPEG (Required for Ubuntu Linux renders)
+      run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      
+    - name: Render Video
+      working-directory: ./remotion-video
+      run: npx remotion render CPA-Automation out/video.mp4
+      
+    - name: Upload Video Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: final-video
+        path: remotion-video/out/video.mp4
+        retention-days: 7
